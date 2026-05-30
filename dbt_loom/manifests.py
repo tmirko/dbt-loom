@@ -4,6 +4,7 @@ import json
 import gzip
 import os
 from pathlib import Path
+import re
 from typing import Dict, List, Optional
 from urllib.parse import unquote, urlunparse
 
@@ -30,6 +31,12 @@ from dbt_loom.config import (
     ManifestReference,
     ManifestReferenceType,
 )
+
+# We may get relation_name values with quoted values. For computing an
+# identifier, we will need to strip the quotes and trust the downstream adapter
+# to add them back in as necessary. This pattern should support most SQL
+# dialects, including Fabric.
+RELATION_NAME_QUOTE_PATTERN = re.compile(r'["`\[\]]')
 
 
 class DependsOn(BaseModel):
@@ -84,7 +91,7 @@ class ManifestNode(BaseModel, use_enum_values=True):
         if not self.relation_name:
             return self.name
 
-        return self.relation_name.split(".")[-1].replace('"', "").replace("`", "")
+        return RELATION_NAME_QUOTE_PATTERN.sub("", self.relation_name.split(".")[-1])
 
     def dump(self) -> Dict:
         """Dump the ManifestNode to a Dict, with support for pydantic 1 and 2"""
